@@ -7,9 +7,17 @@
  * @flow
  */
 
-import * as React from 'react';
+/**
+ * !「源码引入环境调整」
+ * 1. 注释掉 import * as React from 'react'; 和 const ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+ * 2. ReactSharedInternals 从 react 包中引入
+ */
 
-const ReactSharedInternals =
-  React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+// import * as React from 'react';
+
+// const ReactSharedInternals =
+//   React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+
+import ReactSharedInternals from '../react/src/ReactSharedInternals';
 
 export default ReactSharedInternals;

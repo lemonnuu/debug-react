@@ -11,7 +11,7 @@ const OFF = 0;
 const ERROR = 2;
 
 module.exports = {
-  extends: ['fbjs', 'prettier'],
+  extends: [], // !「源码引入环境调整」['fbjs', 'prettier'] -> [],
 
   // Stop ESLint from looking for a configuration file in parent folders
   root: true,
@@ -20,7 +20,7 @@ module.exports = {
     'jest',
     'no-for-of-loops',
     'no-function-declare-after-return',
-    'react',
+    // 'react', // !「源码引入环境调整」注释
     'react-internal',
   ],
 
@@ -52,7 +52,7 @@ module.exports = {
     'no-restricted-syntax': [ERROR, 'WithStatement'],
     'no-shadow': ERROR,
     'no-unused-expressions': ERROR,
-    'no-unused-vars': [ERROR, {args: 'none'}],
+    'no-unused-vars': OFF, // !「源码引入环境调整」[ERROR, {args: 'none'}] -> OFF,
     'no-use-before-define': OFF,
     'no-useless-concat': OFF,
     quotes: [ERROR, 'single', {avoidEscape: true, allowTemplateLiterals: true}],
@@ -111,7 +111,7 @@ module.exports = {
     ],
     'react-internal/no-to-warn-dev-within-to-throw': ERROR,
     'react-internal/warning-args': ERROR,
-    'react-internal/no-production-logging': ERROR,
+    'react-internal/no-production-logging': OFF, // !「源码引入环境调整」ERROR -> OFF,
     'react-internal/no-cross-fork-imports': ERROR,
     'react-internal/no-cross-fork-types': [
       ERROR,

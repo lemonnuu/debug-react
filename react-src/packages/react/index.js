@@ -82,3 +82,9 @@ export {
   useTransition,
   version,
 } from './src/React';
+
+/**
+ * !「源码引入环境调整」需要默认导出 React
+ */
+import * as React from './src/React';
+export default React;

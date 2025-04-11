@@ -54,3 +54,9 @@ export function hydrateRoot(
     }
   }
 }
+
+/**
+ * !「源码引入环境调整」需要默认导出 ReactDOM
+ */
+const ReactDOM = {createRoot, hydrateRoot};
+export default ReactDOM;
