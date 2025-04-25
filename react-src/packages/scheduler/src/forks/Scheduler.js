@@ -41,6 +41,12 @@ import {
   startLoggingProfilingEvents,
 } from '../SchedulerProfiling';
 
+/**
+ * ! 获取当前时间，优先用 performance.now()，否则用 Date.now()
+ * - performance.now() 是高精度时间「微秒级」，Date.now() 是低精度时间「毫秒级」
+ * - performance.now() 基于页面加载时间，​​完全隔离系统时间影响​​，保证稳定性。
+ * - Date.now() 受系统时间影响，比如用户修改系统时间。
+ */
 let getCurrentTime;
 const hasPerformanceNow =
   typeof performance === 'object' && typeof performance.now === 'function';
@@ -69,20 +75,20 @@ var LOW_PRIORITY_TIMEOUT = 10000;
 var IDLE_PRIORITY_TIMEOUT = maxSigned31BitInt;
 
 // Tasks are stored on a min heap
-var taskQueue = [];
-var timerQueue = [];
+var taskQueue = []; // ! 任务队列，基于最小堆实现
+var timerQueue = []; // ! 延迟任务队列，基于最小堆实现，但 React 暂时没有用到
 
 // Incrementing id counter. Used to maintain insertion order.
 var taskIdCounter = 1;
 
 // Pausing the scheduler is useful for debugging.
-var isSchedulerPaused = false;
+var isSchedulerPaused = false; // ! 调度器是否暂停，不用管，当作永远是 false 就好了
 
 var currentTask = null;
 var currentPriorityLevel = NormalPriority;
 
 // This is set while performing work, to prevent re-entrance.
-var isPerformingWork = false;
+var isPerformingWork = false; // ! Work 的锁，是否有 work 在执行
 
 var isHostCallbackScheduled = false;
 var isHostTimeoutScheduled = false;
@@ -186,9 +192,12 @@ function flushWork(hasTimeRemaining, initialTime) {
   }
 }
 
+/**
+ * ! React 调度器处理任务队列的主循环，负责从任务队列中取出并执行任务
+ */
 function workLoop(hasTimeRemaining, initialTime) {
   let currentTime = initialTime;
-  advanceTimers(currentTime);
+  advanceTimers(currentTime); // ! 检查延迟任务是否到期，React 暂时没有用到延迟任务
   currentTask = peek(taskQueue);
   while (
     currentTask !== null &&
@@ -426,6 +435,9 @@ let isMessageLoopRunning = false;
 let scheduledHostCallback = null;
 let taskTimeoutID = -1;
 
+/**
+ * ! 时间切片，周期性的把控制权让出给浏览器
+ */
 // Scheduler periodically yields in case there is other work on the main
 // thread, like user events. By default, it yields multiple times per frame.
 // It does not attempt to align with frame boundaries, since most tasks don't
@@ -437,6 +449,9 @@ let startTime = -1;
 
 let needsPaint = false;
 
+/**
+ * ! 判断是否需要让出控制权给浏览器
+ */
 function shouldYieldToHost() {
   const timeElapsed = getCurrentTime() - startTime;
   if (timeElapsed < frameInterval) {
@@ -453,6 +468,7 @@ function shouldYieldToHost() {
   // eventually yield regardless, since there could be a pending paint that
   // wasn't accompanied by a call to `requestPaint`, or other main thread tasks
   // like network events.
+  // ! 下面的判断条件不会进入，是 false
   if (enableIsInputPending) {
     if (needsPaint) {
       // There's a pending paint (signaled by `requestPaint`). Yield now.
@@ -608,11 +624,11 @@ export {
   LowPriority as unstable_LowPriority,
   unstable_runWithPriority,
   unstable_next,
-  unstable_scheduleCallback,
-  unstable_cancelCallback,
+  unstable_scheduleCallback, // ! 重点
+  unstable_cancelCallback, // ! 重点
   unstable_wrapCallback,
-  unstable_getCurrentPriorityLevel,
-  shouldYieldToHost as unstable_shouldYield,
+  unstable_getCurrentPriorityLevel, // ! 重点
+  shouldYieldToHost as unstable_shouldYield, // ! 重点
   unstable_requestPaint,
   unstable_continueExecution,
   unstable_pauseExecution,
