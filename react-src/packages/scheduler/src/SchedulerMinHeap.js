@@ -3,7 +3,7 @@
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
- *
+ * ! 最小堆实现 - 最小堆是一个父节点永远不大于子节点的完全二叉树，通过数组进行存储
  * @flow strict
  */
 
@@ -13,6 +13,9 @@ type Node = {|
   sortIndex: number,
 |};
 
+/**
+ * ! 最小堆插入时，需要先插入到数组末尾，然后从下往上堆化
+ */
 export function push(heap: Heap, node: Node): void {
   const index = heap.length;
   heap.push(node);
@@ -23,6 +26,9 @@ export function peek(heap: Heap): Node | null {
   return heap.length === 0 ? null : heap[0];
 }
 
+/**
+ * ! 最小堆删除时，需要先删除堆顶元素，然后将末尾子节点提至堆顶，再从上往下堆化
+ */
 export function pop(heap: Heap): Node | null {
   if (heap.length === 0) {
     return null;

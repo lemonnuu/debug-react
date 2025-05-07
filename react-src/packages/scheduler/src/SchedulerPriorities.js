@@ -10,7 +10,7 @@
 export type PriorityLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
 // TODO: Use symbols?
-export const NoPriority = 0; // 无优先级(默认值)
+export const NoPriority = 0; // ! 无优先级(默认值)，实际没有用到，Task 的优先级默认为 NormalPriority
 export const ImmediatePriority = 1; // 立即执行优先级(最高)
 export const UserBlockingPriority = 2; // 用户阻塞优先级(需要快速响应)
 export const NormalPriority = 3; // 普通优先级(默认)

@@ -60,6 +60,7 @@ if (hasPerformanceNow) {
   getCurrentTime = () => localDate.now() - initialTime;
 }
 
+// ! 下面定义了各优先级对应的超时时间
 // Max 31 bit integer. The max integer size in V8 for 32-bit systems.
 // Math.pow(2, 30) - 1
 // 0b111111111111111111111111111111
@@ -79,18 +80,18 @@ var taskQueue = []; // ! 任务队列，基于最小堆实现
 var timerQueue = []; // ! 延迟任务队列，基于最小堆实现，但 React 暂时没有用到
 
 // Incrementing id counter. Used to maintain insertion order.
-var taskIdCounter = 1;
+var taskIdCounter = 1; // ! 任务 id 递增计数器，用于维护插入顺序
 
 // Pausing the scheduler is useful for debugging.
 var isSchedulerPaused = false; // ! 调度器是否暂停，不用管，当作永远是 false 就好了
 
-var currentTask = null;
-var currentPriorityLevel = NormalPriority;
+var currentTask = null; // ! 当前执行的任务
+var currentPriorityLevel = NormalPriority; // ! 当前执行的任务优先级
 
 // This is set while performing work, to prevent re-entrance.
 var isPerformingWork = false; // ! Work 的锁，是否有 work 在执行
 
-var isHostCallbackScheduled = false;
+var isHostCallbackScheduled = false; // ! 主线程是否在调度
 var isHostTimeoutScheduled = false;
 
 // Capture local references to native APIs, in case a polyfill overrides them.
@@ -150,6 +151,7 @@ function handleTimeout(currentTime) {
   }
 }
 
+// ! 执行 workLoop
 function flushWork(hasTimeRemaining, initialTime) {
   if (enableProfiling) {
     markSchedulerUnsuspended(initialTime);
@@ -194,6 +196,10 @@ function flushWork(hasTimeRemaining, initialTime) {
 
 /**
  * ! React 调度器处理任务队列的主循环，负责从任务队列中取出并执行任务
+ * - 有很多 Task，每个 Task 都有一个 callback，callback 执行完了，就执行下一个 Task
+ * - 一个 work 就是一个时间切片内执行的一些 Task
+ * - 时间切片要循环，就是 work 要循环(loop)
+ * ! 返回为 true，就表示任务没有执行完，需要继续执行
  */
 function workLoop(hasTimeRemaining, initialTime) {
   let currentTime = initialTime;
@@ -203,6 +209,7 @@ function workLoop(hasTimeRemaining, initialTime) {
     currentTask !== null &&
     !(enableSchedulerDebugging && isSchedulerPaused)
   ) {
+    // ! 已经过期 && 时间片已经用完 才需跳出循环，否则继续执行 Task
     if (
       currentTask.expirationTime > currentTime &&
       (!hasTimeRemaining || shouldYieldToHost())
@@ -214,13 +221,15 @@ function workLoop(hasTimeRemaining, initialTime) {
     if (typeof callback === 'function') {
       currentTask.callback = null;
       currentPriorityLevel = currentTask.priorityLevel;
-      const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+      const didUserCallbackTimeout = currentTask.expirationTime <= currentTime; // ! 判断任务是否已经超时，比如超时可能会立即同步渲染，没超时可能会并发渲染
       if (enableProfiling) {
         markTaskRun(currentTask, currentTime);
       }
+      // ! 实际的 callback 都是在 react-reconciler 或 react-dom 中被包装定义的，他们会吃这个参数的
       const continuationCallback = callback(didUserCallbackTimeout);
       currentTime = getCurrentTime();
       if (typeof continuationCallback === 'function') {
+        // ! 如果当前任务返回的是一个函数，说明这个任务还没有结束，需要继续执行
         currentTask.callback = continuationCallback;
         if (enableProfiling) {
           markTaskYield(currentTask, currentTime);
@@ -230,14 +239,17 @@ function workLoop(hasTimeRemaining, initialTime) {
           markTaskCompleted(currentTask, currentTime);
           currentTask.isQueued = false;
         }
+        // ! 否则说明这个任务已经结束，需要从任务队列中移除，但是在移除前，需要判断当前任务是否是队列中的第一个任务，因为 callback 的执行可能会改变任务队列
         if (currentTask === peek(taskQueue)) {
           pop(taskQueue);
         }
       }
       advanceTimers(currentTime);
     } else {
+      // ! 如果当前任务的 callback 不是函数，说明这个任务已经结束，需要从任务队列中移除
       pop(taskQueue);
     }
+    // ! 获取下一个任务
     currentTask = peek(taskQueue);
   }
   // Return whether there's additional work
@@ -314,6 +326,9 @@ function unstable_wrapCallback(callback) {
   };
 }
 
+/**
+ * ! 任务调度器入口函数
+ */
 function unstable_scheduleCallback(priorityLevel, callback, options) {
   var currentTime = getCurrentTime();
 
@@ -355,15 +370,16 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
     id: taskIdCounter++,
     callback,
     priorityLevel,
-    startTime,
-    expirationTime,
-    sortIndex: -1,
+    startTime, // ! 任务到达时间
+    expirationTime, // ! 任务过期时间，也就是 理想状态中 的 实际执行时间
+    sortIndex: -1, // ! 排序索引，依据任务优先级、到达时间和过期时间计算
   };
   if (enableProfiling) {
     newTask.isQueued = false;
   }
 
   if (startTime > currentTime) {
+    // ! 延迟任务逻辑，实际没用到
     // This is a delayed task.
     newTask.sortIndex = startTime;
     push(timerQueue, newTask);
@@ -379,6 +395,7 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
       requestHostTimeout(handleTimeout, startTime - currentTime);
     }
   } else {
+    // ! 普通任务逻辑，走的都是这里
     newTask.sortIndex = expirationTime;
     push(taskQueue, newTask);
     if (enableProfiling) {
@@ -387,6 +404,7 @@ function unstable_scheduleCallback(priorityLevel, callback, options) {
     }
     // Schedule a host callback, if needed. If we're already performing work,
     // wait until the next time we yield.
+    // ! 没有主线程调度也没有时间切片在执行
     if (!isHostCallbackScheduled && !isPerformingWork) {
       isHostCallbackScheduled = true;
       requestHostCallback(flushWork);
@@ -412,6 +430,10 @@ function unstable_getFirstCallbackNode() {
   return peek(taskQueue);
 }
 
+/**
+ * ! 取消某个任务，由于最小堆没法直接删除，所以只能初步把 callback 置为 null
+ * ! 在调度过程中，当这个任务位于堆顶时，再删除
+ */
 function unstable_cancelCallback(task) {
   if (enableProfiling) {
     if (task.isQueued) {
@@ -427,12 +449,15 @@ function unstable_cancelCallback(task) {
   task.callback = null;
 }
 
+/**
+ * ! 获取当前任务的优先级
+ */
 function unstable_getCurrentPriorityLevel() {
   return currentPriorityLevel;
 }
 
-let isMessageLoopRunning = false;
-let scheduledHostCallback = null;
+let isMessageLoopRunning = false; // ! 消息循环(message loop) 是否正在运行
+let scheduledHostCallback = null; // ! 实际上就是 flushWork
 let taskTimeoutID = -1;
 
 /**
@@ -442,10 +467,10 @@ let taskTimeoutID = -1;
 // thread, like user events. By default, it yields multiple times per frame.
 // It does not attempt to align with frame boundaries, since most tasks don't
 // need to be frame aligned; for those that do, use requestAnimationFrame.
-let frameInterval = frameYieldMs;
+let frameInterval = frameYieldMs; // ! 时间切片，一个时间片段，5ms
 const continuousInputInterval = continuousYieldMs;
 const maxInterval = maxYieldMs;
-let startTime = -1;
+let startTime = -1; // ! 记录时间切片的起始值
 
 let needsPaint = false;
 
@@ -528,6 +553,7 @@ function forceFrameRate(fps) {
   }
 }
 
+// ! 实际时间切片函数的执行
 const performWorkUntilDeadline = () => {
   if (scheduledHostCallback !== null) {
     const currentTime = getCurrentTime();
@@ -542,6 +568,7 @@ const performWorkUntilDeadline = () => {
     // Intentionally not using a try-catch, since that makes some debugging
     // techniques harder. Instead, if `scheduledHostCallback` errors, then
     // `hasMoreWork` will remain true, and we'll continue the work loop.
+    // ! work loop 的返回值表示了是否有更多任务，实际上 hasMoreWork 就表示是否还有更多任务
     let hasMoreWork = true;
     try {
       hasMoreWork = scheduledHostCallback(hasTimeRemaining, currentTime);
@@ -549,8 +576,10 @@ const performWorkUntilDeadline = () => {
       if (hasMoreWork) {
         // If there's more work, schedule the next message event at the end
         // of the preceding one.
+        // ! 有更多任务，继续调度时间切片的执行
         schedulePerformWorkUntilDeadline();
       } else {
+        // ! 没有更多任务，将 isMessageLoopRunning 设置为 false，表示没有在执行时间切片
         isMessageLoopRunning = false;
         scheduledHostCallback = null;
       }
@@ -563,8 +592,10 @@ const performWorkUntilDeadline = () => {
   needsPaint = false;
 };
 
+// ! 调度时间切片的执行，本质上就是模拟 requestIdleCallback
 let schedulePerformWorkUntilDeadline;
 if (typeof localSetImmediate === 'function') {
+  // ! Node 和 旧版IE 浏览器使用 setImmediate 实现
   // Node.js and old IE.
   // There's a few reasons for why we prefer setImmediate.
   //
@@ -580,6 +611,7 @@ if (typeof localSetImmediate === 'function') {
     localSetImmediate(performWorkUntilDeadline);
   };
 } else if (typeof MessageChannel !== 'undefined') {
+  // ! 浏览器使用 MessageChannel 实现
   // DOM and Worker environments.
   // We prefer MessageChannel because of the 4ms setTimeout clamping.
   const channel = new MessageChannel();
@@ -589,12 +621,16 @@ if (typeof localSetImmediate === 'function') {
     port.postMessage(null);
   };
 } else {
+  // ! setTimeout(performWorkUntilDeadline, 0) 是兜底方案
   // We should only fallback here in non-browser environments.
   schedulePerformWorkUntilDeadline = () => {
     localSetTimeout(performWorkUntilDeadline, 0);
   };
 }
 
+/**
+ * ! 调度任务函数，通过 messageChannel 模拟浏览器的 requestIdleCallback
+ */
 function requestHostCallback(callback) {
   scheduledHostCallback = callback;
   if (!isMessageLoopRunning) {
@@ -624,11 +660,11 @@ export {
   LowPriority as unstable_LowPriority,
   unstable_runWithPriority,
   unstable_next,
-  unstable_scheduleCallback, // ! 重点
-  unstable_cancelCallback, // ! 重点
+  unstable_scheduleCallback, // ! 某个任务进入调度器，等待调度
+  unstable_cancelCallback, // ! 取消某个任务，由于最小堆无法直接删除，因此把 task.callback 置为 null
   unstable_wrapCallback,
-  unstable_getCurrentPriorityLevel, // ! 重点
-  shouldYieldToHost as unstable_shouldYield, // ! 重点
+  unstable_getCurrentPriorityLevel, // ! 获取当前正在执行任务的优先级
+  shouldYieldToHost as unstable_shouldYield, // ! 把控制权交还给主线程
   unstable_requestPaint,
   unstable_continueExecution,
   unstable_pauseExecution,
