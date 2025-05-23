@@ -98,6 +98,7 @@ ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render = functio
   }
 
   if (__DEV__) {
+    // ! 老版本提示改造, render 只接收一个参数 children
     if (typeof arguments[1] === 'function') {
       console.error(
         'render(...): does not support the second callback argument. ' +
@@ -118,6 +119,7 @@ ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render = functio
     const container = root.containerInfo;
 
     if (container.nodeType !== COMMENT_NODE) {
+      // ! 检查 container 是否被移除
       const hostInstance = findHostInstanceWithNoPortals(root.current);
       if (hostInstance) {
         if (hostInstance.parentNode !== container) {
@@ -131,6 +133,7 @@ ReactDOMHydrationRoot.prototype.render = ReactDOMRoot.prototype.render = functio
       }
     }
   }
+  // ! 核心逻辑
   updateContainer(children, root, null, null);
 };
 
@@ -156,6 +159,7 @@ ReactDOMHydrationRoot.prototype.unmount = ReactDOMRoot.prototype.unmount = funct
         );
       }
     }
+    // ! flushSync 允许在提供的回调函数中强制同步刷新任何更新, 以确保在卸载根节点之前完成当前渲染。
     flushSync(() => {
       updateContainer(null, root, null, null);
     });
@@ -167,10 +171,12 @@ export function createRoot(
   container: Element | Document | DocumentFragment,
   options?: CreateRootOptions,
 ): RootType {
+  // ! 校验 container 是否合法
   if (!isValidContainer(container)) {
     throw new Error('createRoot(...): Target container is not a DOM element.');
   }
 
+  // ! container 不能是 body 或已挂载过 ReactDOMRoot 的元素
   warnIfReactDOMContainerInDEV(container);
 
   let isStrictMode = false;
@@ -221,6 +227,7 @@ export function createRoot(
     }
   }
 
+  // ! 创建 FiberRoot
   const root = createContainer(
     container,
     ConcurrentRoot,
@@ -231,12 +238,15 @@ export function createRoot(
     onRecoverableError,
     transitionCallbacks,
   );
+  // ! 标记 container 为根 fiber 挂载节点
   markContainerAsRoot(root.current, container);
 
+  // comment nodes 已弃用，这里是为了兼容 FB 老代码 https://github.com/facebook/react/pull/24110
   const rootContainerElement: Document | Element | DocumentFragment =
     container.nodeType === COMMENT_NODE
       ? (container.parentNode: any)
       : container;
+  // ! 从 container 层监听 listenToAllSupportedEvents，涉及合成事件，比较复杂
   listenToAllSupportedEvents(rootContainerElement);
 
   return new ReactDOMRoot(root);
@@ -354,11 +364,14 @@ export function isValidContainerLegacy(node: any): boolean {
 
 function warnIfReactDOMContainerInDEV(container: any) {
   if (__DEV__) {
+    // ! 不允许挂在 document.body 上
     if (
       container.nodeType === ELEMENT_NODE &&
       ((container: any): Element).tagName &&
       ((container: any): Element).tagName.toUpperCase() === 'BODY'
     ) {
+      // document.body 的子元素经常被第三方脚本和浏览器扩展操作
+      // 这可能导致微妙的协调(reconciliation)问题，建议使用专门为应用创建的容器元素
       console.error(
         'createRoot(): Creating roots directly with document.body is ' +
           'discouraged, since its children are often manipulated by third-party ' +
@@ -367,7 +380,10 @@ function warnIfReactDOMContainerInDEV(container: any) {
           'for your app.',
       );
     }
+    // ! 不允许挂在已经挂载了 ReactDOMRoot 的元素上，也就是之前使用过 root.render() 的元素上
+    // ! 挂载时会添加 '__reactContainer$' + randomKey
     if (isContainerMarkedAsRoot(container)) {
+      // ! 旧版标记，旧版是使用 ReactDOM.render() 挂载，会在元素上添加 _reactRootContainer 属性
       if (container._reactRootContainer) {
         console.error(
           'You are calling ReactDOMClient.createRoot() on a container that was previously ' +

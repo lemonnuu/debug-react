@@ -452,6 +452,7 @@ export function getCurrentTime() {
 export function requestUpdateLane(fiber: Fiber): Lane {
   // Special cases
   const mode = fiber.mode;
+  // 非并发模式直接返回同步 lane
   if ((mode & ConcurrentMode) === NoMode) {
     return (SyncLane: Lane);
   } else if (
@@ -471,6 +472,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
     return pickArbitraryLane(workInProgressRootRenderLanes);
   }
 
+  // ! 过渡(Transition) 更新处理
   const isTransition = requestCurrentTransition() !== NoTransition;
   if (isTransition) {
     if (__DEV__ && ReactCurrentBatchConfig.transition !== null) {
@@ -501,6 +503,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  // ! React 内部的一些更新, 比如 flushSync, 其优先级由 React 内部的上下文变量来跟踪
   const updateLane: Lane = (getCurrentUpdatePriority(): any);
   if (updateLane !== NoLane) {
     return updateLane;
@@ -512,6 +515,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  // ! React 外部的更新, 根据事件类型, 由 host 环境来决定优先级
   const eventLane: Lane = (getCurrentEventPriority(): any);
   return eventLane;
 }

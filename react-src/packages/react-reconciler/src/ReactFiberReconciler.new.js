@@ -318,6 +318,10 @@ export function createHydrationContainer(
   return root;
 }
 
+/**
+ * ! 协调器(reconciler) 中的核心函数, 负责触发组件树的更新
+ * ! 有用的参数就是 element 和 container, parentComponent 和 callback 没用, 兼容老代码的
+ */
 export function updateContainer(
   element: ReactNodeList,
   container: OpaqueRoot,
@@ -325,16 +329,19 @@ export function updateContainer(
   callback: ?Function,
 ): Lane {
   if (__DEV__) {
+    // 通知DevTools 有更新被调度
     onScheduleRoot(container, element);
   }
   const current = container.current;
   const eventTime = requestEventTime();
-  const lane = requestUpdateLane(current);
+  const lane = requestUpdateLane(current); // ! 获取本次 update 对应的 lane(优先级) -> DefaultLane
 
   if (enableSchedulingProfiler) {
     markRenderScheduled(lane);
   }
 
+  // ! parentComponent 为 null，此处代码只是返回一个空对象
+  // ! 此处用于兼容老代码，不用关注
   const context = getContextForSubtree(parentComponent);
   if (container.context === null) {
     container.context = context;
@@ -359,11 +366,13 @@ export function updateContainer(
     }
   }
 
+  // ! 创建（初始化）更新对象
   const update = createUpdate(eventTime, lane);
   // Caution: React DevTools currently depends on this property
   // being called "element".
   update.payload = {element};
 
+  // ! 页面初次渲染时，React@18 已取消 callback，也就是 render 没有回调
   callback = callback === undefined ? null : callback;
   if (callback !== null) {
     if (__DEV__) {
@@ -378,9 +387,12 @@ export function updateContainer(
     update.callback = callback;
   }
 
+  // ! 将 update 放入 fiber 的 updateQueue 中
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
+    // ! 调度更新
     scheduleUpdateOnFiber(root, current, lane, eventTime);
+    // ! 处理 transitions，非紧急更新
     entangleTransitions(root, current, lane);
   }
 

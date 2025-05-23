@@ -123,27 +123,27 @@ import assign from 'shared/assign';
 export type Update<State> = {|
   // TODO: Temporary field. Will remove this by storing a map of
   // transition -> event time on the root.
-  eventTime: number,
-  lane: Lane,
+  eventTime: number, // ! 更新时间戳
+  lane: Lane, // ! 更新任务所属优先级
 
-  tag: 0 | 1 | 2 | 3,
-  payload: any,
-  callback: (() => mixed) | null,
+  tag: 0 | 1 | 2 | 3, // ! 更新类型标记 (0=UpdateState,1=ReplaceState,2=ForceUpdate,3=CaptureUpdate)
+  payload: any, // ! 更新负载数据 (可以是新状态或更新函数)
+  callback: (() => mixed) | null, // ! 更新后的回调函数
 
-  next: Update<State> | null,
+  next: Update<State> | null, // ! 指向下一个更新的指针，形成链表结构
 |};
 
 export type SharedQueue<State> = {|
-  pending: Update<State> | null,
-  lanes: Lanes,
+  pending: Update<State> | null, // ! 待处理的更新链表，是一个 单向循环链表，尾节点 -> 头结点
+  lanes: Lanes, // ! 当前队列中所有更新涉及的优先级通道集合
 |};
 
 export type UpdateQueue<State> = {|
-  baseState: State,
-  firstBaseUpdate: Update<State> | null,
-  lastBaseUpdate: Update<State> | null,
-  shared: SharedQueue<State>,
-  effects: Array<Update<State>> | null,
+  baseState: State, // ! 第一个更新前的基准状态
+  firstBaseUpdate: Update<State> | null, // ! 第一个待处理的更新
+  lastBaseUpdate: Update<State> | null, // ! 最后一个待处理的更新
+  shared: SharedQueue<State>, // ! 共享的更新队列
+  effects: Array<Update<State>> | null, // ! 有回调的更新集合
 |};
 
 export const UpdateState = 0;
@@ -167,10 +167,13 @@ if (__DEV__) {
   };
 }
 
+// ! 初始化 fiber.updateQueue，在 beginWork 阶段中的 updateHostRoot 会用到
 export function initializeUpdateQueue<State>(fiber: Fiber): void {
   const queue: UpdateQueue<State> = {
     baseState: fiber.memoizedState,
+    // ! 单链表结构 firstBaseUpdate -> ... -> lastBaseUpdate
     firstBaseUpdate: null,
+    // ! ⼀般情况下，单链表是不⽤记录尾节点，这⾥记录尾节点是为了快速比较两个单链表
     lastBaseUpdate: null,
     shared: {
       pending: null,
@@ -242,6 +245,7 @@ export function enqueueUpdate<State>(
     }
   }
 
+  // 类组件旧的生命周期相关的 update，这里不再展开详解
   if (isUnsafeClassRenderPhaseUpdate(fiber)) {
     // This is an unsafe render phase update. Add directly to the update
     // queue so we can process it immediately during the current render.

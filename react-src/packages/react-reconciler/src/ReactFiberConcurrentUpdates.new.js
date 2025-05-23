@@ -92,19 +92,24 @@ function enqueueUpdate(
   update: ConcurrentUpdate | null,
   lane: Lane,
 ) {
+  // 不要立即更新`childLanes`。如果已经在渲染中，等待渲染完成后再处理
   // Don't update the `childLanes` on the return path yet. If we already in
   // the middle of rendering, wait until after it has completed.
+  // 将更新信息存入并发队列数组
   concurrentQueues[concurrentQueuesIndex++] = fiber;
   concurrentQueues[concurrentQueuesIndex++] = queue;
   concurrentQueues[concurrentQueuesIndex++] = update;
   concurrentQueues[concurrentQueuesIndex++] = lane;
 
+  // 合并当前更新的优先级通道到全局记录中
   concurrentlyUpdatedLanes = mergeLanes(concurrentlyUpdatedLanes, lane);
 
   // The fiber's `lane` field is used in some places to check if any work is
   // scheduled, to perform an eager bailout, so we need to update it immediately.
+  // 立即更新fiber的lanes字段，用于检查是否有待处理的工作
   // TODO: We should probably move this to the "shared" queue instead.
   fiber.lanes = mergeLanes(fiber.lanes, lane);
+  // 如果存在alternate fiber(workInProgress fiber)，也更新其lanes
   const alternate = fiber.alternate;
   if (alternate !== null) {
     alternate.lanes = mergeLanes(alternate.lanes, lane);
@@ -137,6 +142,9 @@ export function enqueueConcurrentHookUpdateAndEagerlyBailout<S, A>(
   enqueueUpdate(fiber, concurrentQueue, concurrentUpdate, lane);
 }
 
+/**
+ * ! 将类组件的更新加入并发更新队列
+ */
 export function enqueueConcurrentClassUpdate<State>(
   fiber: Fiber,
   queue: ClassQueue<State>,

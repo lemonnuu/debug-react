@@ -60,6 +60,7 @@ export function precacheFiberNode(
 }
 
 export function markContainerAsRoot(hostRoot: Fiber, node: Container): void {
+  // ! getCloseInstanceFromNode 和 getInstanceFromNode 中会根据 internalContainerInstanceKey 获取 fiber
   node[internalContainerInstanceKey] = hostRoot;
 }
 

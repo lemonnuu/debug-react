@@ -199,10 +199,12 @@ function applyDerivedStateFromProps(
 const classComponentUpdater = {
   isMounted,
   enqueueSetState(inst, payload, callback) {
+    // ! 获取 current 和 lane
     const fiber = getInstance(inst);
     const eventTime = requestEventTime();
     const lane = requestUpdateLane(fiber);
 
+    // ! 创建 update
     const update = createUpdate(eventTime, lane);
     update.payload = payload;
     if (callback !== undefined && callback !== null) {
@@ -212,9 +214,12 @@ const classComponentUpdater = {
       update.callback = callback;
     }
 
+    // ! 将 update 放入 fiber 的 updateQueue 中
     const root = enqueueUpdate(fiber, update, lane);
     if (root !== null) {
+      // ! 调度更新
       scheduleUpdateOnFiber(root, fiber, lane, eventTime);
+      // ! 处理 transitions，非紧急更新
       entangleTransitions(root, fiber, lane);
     }
 
@@ -267,10 +272,12 @@ const classComponentUpdater = {
     }
   },
   enqueueForceUpdate(inst, callback) {
+    // ! 获取 current 和 lane
     const fiber = getInstance(inst);
     const eventTime = requestEventTime();
     const lane = requestUpdateLane(fiber);
 
+    // ! 创建 update
     const update = createUpdate(eventTime, lane);
     update.tag = ForceUpdate;
 
@@ -281,9 +288,12 @@ const classComponentUpdater = {
       update.callback = callback;
     }
 
+    // ! 将 update 放入 fiber 的 updateQueue 中
     const root = enqueueUpdate(fiber, update, lane);
     if (root !== null) {
+      // ! 调度更新
       scheduleUpdateOnFiber(root, fiber, lane, eventTime);
+      // ! 处理 transitions，非紧急更新
       entangleTransitions(root, fiber, lane);
     }
 

@@ -368,6 +368,7 @@ export function createTextInstance(
 export function getCurrentEventPriority(): * {
   const currentEvent = window.event;
   if (currentEvent === undefined) {
+    // ? 初次渲染 render 没有事件, 默认返回 DefaultEventPriority
     return DefaultEventPriority;
   }
   return getEventPriority(currentEvent.type);

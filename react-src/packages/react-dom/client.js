@@ -27,6 +27,9 @@ export function createRoot(
   options?: CreateRootOptions,
 ): RootType {
   if (__DEV__) {
+    // ! usingClientEntryPoint 表示是否是通过 React 开放的标准 API 调用，就是得从 'react-dom/client' 导入
+    // ! 因为以前可以 import { createRoot } from 'react-dom' 来使用，但是现在不推荐了，react@19 更是直接去掉了这种兼容的导入方式
+    // ! 主要目的是面向开发者提供更准确的警告信息
     Internals.usingClientEntryPoint = true;
   }
   try {
